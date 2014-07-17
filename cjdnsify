@@ -1,11 +1,28 @@
 #!/usr/bin/env bash
 
-. /etc/default/cjdnsify
+# Location of the config file
+CONFIG="/etc/default/cjdnsify"
 
-CJDNSADDRESS=$(ifconfig | grep -A 1 $CJDNSTUN | grep inet6 | sed "s/\ *inet6\ //g ; s/\ .*//")
+function error() {
+    echo "Error: ${1}"
+    exit 1
+}
 
-if [ $(echo "$CJDNSADDRESS" | wc -m) -gt 1 ]; then
-  FORCE_BIND_ADDRESS_V4="127.0.0.1" FORCE_BIND_ADDRESS_V6="$CJDNSADDRESS" LD_PRELOAD="$BINDLIB" "$@"
-else
-  echo "cjdns not running"
-fi
+# Exit with an error if no arguments are given
+[[ -z "$1" ]] && error "no arguments given (provide a command you wish to run with limited network access)"
+
+# Load the config if it exists, then load defaults for unset variables
+[[ -f "$CONFIG" ]] && source "$CONFIG"
+[[ -z "$FORCE_BIND" ]] && FORCE_BIND="/usr/lib/force_bind.so"
+[[ -z "$CJDNS_TUN" ]] && CJDNS_TUN="tun0"
+
+# Check the values of each variable to ensure they're not incorrect
+[[ $(grep inet6 < <(ip addr show dev $CJDNS_TUN 2>&1)) ]] || error "${CJDNS_TUN} does not exist (is cjdns running?)"
+[[ -f "$FORCE_BIND" ]] || error "force_bind library does not exist at ${FORCE_BIND}"
+
+# Calculate the CJDNS ipv6, then check that it's valid and error if it's not
+CJDNS_ADDR=$(ip addr show dev $CJDNS_TUN | grep "inet6 fc" | sed 's|^\s*inet6\ ||;s|\/8\ .*$||')
+[[ $(sed 's|[^:]*||g' <<< "$CJDNS_ADDR" | wc -m) = 8 ]] || error "couldn't calculate address for ${CJDNS_TUN}"
+
+# Configure and preload force_bind and run the provided arguments
+FORCE_BIND_ADDRESS_V4="127.0.0.1" FORCE_BIND_ADDRESS_V6="$CJDNS_ADDR" LD_PRELOAD="$FORCE_BIND" "$@"
