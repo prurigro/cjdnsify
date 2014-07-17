@@ -1,6 +1,6 @@
 # cjdnsify #
 
-A wrapper for [force_bind](http://kernel.embedromix.ro/us/) that allows programs compatible with **ld_preload** to be restricted to a given cjdns tun device when run.
+A wrapper for [force_bind](http://kernel.embedromix.ro/us/) that allows programs compatible with **ld_preload** to be restricted to the cjdns ipv6 address on a given cjdns tun device when run.
 
 ## Requirements ##
 
